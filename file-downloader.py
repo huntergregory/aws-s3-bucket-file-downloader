@@ -5,11 +5,13 @@ import xml.etree.ElementTree as ET
 import urllib.request
 import os
 import shutil
+from tqdm import tqdm
 
 ## Argument Parsing
 parser = ArgumentParser()
-parser.add_argument("--url", required=True, help="Bucket URL (show's an XML file in your browser).") 
+parser.add_argument("url", help="Bucket URL (show's an XML file in your browser).") 
 parser.add_argument("-D", dest="should_download", required=False, action="store_true", default=False, help="If turned on, downloads files to the current directory. Otherwise, filenames and sizes are printed only.")
+parser.add_argument("--dir", required=False, default="./", help="Directory to save downloads.")
 parser.add_argument("--max-filesize-KB", "-m", type=int, required=False, default=1000, help="Maximum file size for each download in KiloBytes. Default is 1000 KB.")
 parser.add_argument("--download-capacity", "-c", type=int, required=False, default=250, help="Maximum number of MegaBytes for total download (sum of all files). Default is 250 MB.")
 parser.add_argument("--filetypes", "-t", required=False, help="Comma-separated file types to include (leave out the '.')")
@@ -19,6 +21,10 @@ parser.add_argument("--silence-large-files", "-s", required=False, action="store
 
 args = parser.parse_args()
 print("Arguments: {}".format(args))
+if args.should_download:
+    if not os.path.isdir(args.dir):
+        os.mkdir(args.dir)
+    os.chdir(args.dir)
 
 ## Filename Regex Helper
 if args.filetypes:
@@ -137,7 +143,6 @@ def get_good_filename(name):
             return new_name
     return None
 
-from tqdm import tqdm
 if args.should_download:
     print("Beginning Downloads")
     clean_url = args.url
