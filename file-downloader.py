@@ -19,7 +19,6 @@ parser.add_argument("--filetypes", "-t", required=False, help="Comma-separated f
 parser.add_argument("--filename-pattern", "-p", required=False, help="Regular expression for filenames to include. Doesn't need to match the whole entire filename, just part of it.")
 parser.add_argument("--verbose", "-v", required=False, action="store_true", default=False, help="Prints files found but not matched.")
 parser.add_argument("--silence-large-files", "-s", required=False, action="store_true", default=False, help="Silences printing of matched files with unknown or to large a size.")
-parser.add_argument("--unzip-zips", "-z", required=False, action="store_true", default=False, help="Unzips zip files and deletes the original zip files. WARNING: Never extract archives from untrusted sources without prior inspection.")
 
 args = parser.parse_args()
 print("Arguments:")
@@ -169,10 +168,6 @@ if args.should_download and len(matched_files) > 0:
         try:
             with urllib.request.urlopen(download_url) as response, open(good_name, 'wb') as out_file:
                 shutil.copyfileobj(response, out_file)
-                if extension == ".zip" and args.unzip_zips:
-                    with zipfile.ZipFile(good_name, 'r') as zip_ref:
-                        zip_ref.extractall()
-                        os.remove(good_name)
         except Exception as e:
             print("[WARN] Encountered exception while downloading {}: {}".format(good_name, e))
             failed_downloads.append(good_name)
