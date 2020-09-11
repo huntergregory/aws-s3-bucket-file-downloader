@@ -16,7 +16,7 @@ parser.add_argument("--dir", required=False, default="./", help="Directory to sa
 parser.add_argument("--max-filesize-KB", "-m", type=int, required=False, default=1000, help="Maximum file size for each download in KiloBytes. Default is 1000 KB.")
 parser.add_argument("--download-capacity", "-c", type=int, required=False, default=250, help="Maximum number of MegaBytes for total download (sum of all files). Default is 250 MB.")
 parser.add_argument("--filetypes", "-t", required=False, help="Comma-separated file types to include (leave out the '.')")
-parser.add_argument("--filename-pattern", "-p", required=False, help="Regular expression for filenames to include. The file extension is handled automatically if you specify filetypes. Pattern must match the filename completely. For example, with a filetype of 'txt', the pattern 'abc' wouldn't match 'abc1.txt', but 'abc[0-9]' would match.")
+parser.add_argument("--filename-pattern", "-p", required=False, help="Regular expression for filenames to include. Doesn't need to match the whole entire filename, just part of it.")
 parser.add_argument("--verbose", "-v", required=False, action="store_true", default=False, help="Prints files found but not matched.")
 parser.add_argument("--silence-large-files", "-s", required=False, action="store_true", default=False, help="Silences printing of matched files with unknown or to large a size.")
 parser.add_argument("--unzip-zips", "-z", required=False, action="store_true", default=False, help="Unzips zip files and deletes the original zip files. WARNING: Never extract archives from untrusted sources without prior inspection.")
@@ -33,7 +33,7 @@ if args.should_download:
 ## Filename Regex Helper
 if args.filetypes:
     start = args.filename_pattern if args.filename_pattern else ".*"
-    filename_regex_strings = ["{}\.{}$".format(start, filetype) for filetype in args.filetypes.split(",")]
+    filename_regex_strings = ["{}.*\.{}$".format(start, filetype) for filetype in args.filetypes.split(",")]
 elif args.filename_pattern:
     filename_regex_strings = [args.filename_pattern]
 else:
@@ -62,7 +62,10 @@ matched_files = []
 large_files = []
 unmatched_files = []
 found_files = False
-root = ET.fromstring(result.text)
+try:
+    root = ET.fromstring(result.text)
+except ET.ParseError:
+    raise RuntimeError("Couldn't parse the URL content as XML")
 for child in root:
     if trim_xml_tag(child.tag) == "Contents":
         filename = ""
@@ -131,7 +134,6 @@ if args.verbose and len(unmatched_files) > 0:
     print()
 
 ## Downloading
-dot_regex = re.compile("\.")
 def get_good_filename(name):
     splits = re.split("\.", name)
     if len(splits) == 1: 
@@ -152,13 +154,13 @@ def get_good_filename(name):
 
 if args.should_download and len(matched_files) > 0:
     print("Beginning Downloads")
+    failed_downloads = []
     clean_url = args.url
     if clean_url[-1] != "/":
         clean_url += "/"
     for name, size in tqdm(matched_files):
         download_url = clean_url + name
         good_name, extension = get_good_filename(name)
-        print("extension: {}".format(extension))
         if not good_name:
             print("Couldn't download {} because the file and similar names for it already exist.".format(name))
             continue
@@ -173,5 +175,10 @@ if args.should_download and len(matched_files) > 0:
                         os.remove(good_name)
         except Exception as e:
             print("[WARN] Encountered exception while downloading {}: {}".format(good_name, e))
-
+            failed_downloads.append(good_name)
+    print("Failed Downloads: ")
+    for download in failed_downloads:
+        print(download)
+    print()
+    print("Failed Downloads regex: {}".format("|".join(["({})".format(filename) for filename in failed_downloads])))
     print("Done downloading.")
