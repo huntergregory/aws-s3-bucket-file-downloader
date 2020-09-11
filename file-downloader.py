@@ -5,6 +5,7 @@ import xml.etree.ElementTree as ET
 import urllib.request
 import os
 import shutil
+import zipfile
 from tqdm import tqdm
 
 ## Argument Parsing
@@ -18,9 +19,12 @@ parser.add_argument("--filetypes", "-t", required=False, help="Comma-separated f
 parser.add_argument("--filename-pattern", "-p", required=False, help="Regular expression for filenames to include. The file extension is handled automatically if you specify filetypes. Pattern must match the filename completely. For example, with a filetype of 'txt', the pattern 'abc' wouldn't match 'abc1.txt', but 'abc[0-9]' would match.")
 parser.add_argument("--verbose", "-v", required=False, action="store_true", default=False, help="Prints files found but not matched.")
 parser.add_argument("--silence-large-files", "-s", required=False, action="store_true", default=False, help="Silences printing of matched files with unknown or to large a size.")
+parser.add_argument("--unzip-zips", "-z", required=False, action="store_true", default=False, help="Unzips zip files and deletes the original zip files. WARNING: Never extract archives from untrusted sources without prior inspection.")
 
 args = parser.parse_args()
-print("Arguments: {}".format(args))
+print("Arguments:")
+print(args)
+print()
 if args.should_download:
     if not os.path.isdir(args.dir):
         os.mkdir(args.dir)
@@ -52,6 +56,7 @@ status_message = "HTTP GET status code: {}".format(result.status_code)
 if result.status_code != 200:
     raise RuntimeError(status_message)
 print(status_message)
+print()
 
 matched_files = []
 large_files = []
@@ -110,7 +115,7 @@ if len(matched_files) > 0:
     print()
 elif not found_files:
     print("Couldn't find files at {}".format(args.url))
-else:
+elif not len(large_files) > 0:
     print("No files matched the criteria.")
 
 if len(large_files) > 0 and not args.silence_large_files:
@@ -128,8 +133,6 @@ if args.verbose and len(unmatched_files) > 0:
 ## Downloading
 dot_regex = re.compile("\.")
 def get_good_filename(name):
-    if not os.path.exists(name):
-        return name
     splits = re.split("\.", name)
     if len(splits) == 1: 
         extension = ""
@@ -137,26 +140,38 @@ def get_good_filename(name):
     else:
         extension = "." + splits[-1]
         start = name[:-len(extension)]
+
+    if not os.path.exists(name):
+        return name, extension
+
     for k in range(1,10):
         new_name = "{}({}){}".format(start, k, extension)
         if not os.path.exists(new_name):
-            return new_name
-    return None
+            return new_name, extension
+    return None, None
 
-if args.should_download:
+if args.should_download and len(matched_files) > 0:
     print("Beginning Downloads")
     clean_url = args.url
     if clean_url[-1] != "/":
         clean_url += "/"
     for name, size in tqdm(matched_files):
         download_url = clean_url + name
-        good_name = get_good_filename(name)
+        good_name, extension = get_good_filename(name)
+        print("extension: {}".format(extension))
         if not good_name:
             print("Couldn't download {} because the file and similar names for it already exist.".format(name))
             continue
         if good_name != name:
             print("{} already exists. Renaming downloaded file to {}".format(name, good_name))
-        with urllib.request.urlopen(download_url) as response, open(good_name, 'wb') as out_file:
-            shutil.copyfileobj(response, out_file)
+        try:
+            with urllib.request.urlopen(download_url) as response, open(good_name, 'wb') as out_file:
+                shutil.copyfileobj(response, out_file)
+                if extension == ".zip" and args.unzip_zips:
+                    with zipfile.ZipFile(good_name, 'r') as zip_ref:
+                        zip_ref.extractall()
+                        os.remove(good_name)
+        except Exception as e:
+            print("[WARN] Encountered exception while downloading {}: {}".format(good_name, e))
 
     print("Done downloading.")
