@@ -14,6 +14,7 @@ all_bss = None
 for city in CITIES:
     folder = './bss/{}/'.format(city)
     print('Starting to merge files for {}'.format(city))
+    city_bss = None
     with os.scandir(folder) as files:
         for file in tqdm(sorted(files, key=lambda file: file.name)):
             if file.name.endswith('.csv') and file.is_file():
@@ -21,9 +22,14 @@ for city in CITIES:
                 print('Processing {}'.format(file.name))
                 converted_df = convert_df(df, city)
                 # add_weather(converted_df, city)
-                if all_bss is None:
-                    all_bss = converted_df
+                if city_bss is None:
+                    city_bss = converted_df
                 else:
-                    all_bss = all_bss.append(converted_df)
+                    city_bss = city_bss.append(converted_df)
+    city_bss.to_csv('{}_bss.csv'.format(city))
+    if all_bss is None:
+        all_bss = city_bss
+    else:
+        all_bss.append(city_bss)
 
-all_bss.to_csv('merged_bss.csv')
+all_bss.to_csv('all_bss.csv')
