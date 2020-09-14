@@ -170,10 +170,12 @@ if args.should_download and len(matched_files) > 0:
                 shutil.copyfileobj(response, out_file)
         except Exception as e:
             print("[WARN] Encountered exception while downloading {}: {}".format(good_name, e))
-            failed_downloads.append(good_name)
-    print("Failed Downloads: ")
-    for download in failed_downloads:
-        print(download)
-    print()
-    print("Failed Downloads regex: {}".format("|".join(["({})".format(filename) for filename in failed_downloads])))
+            
+    if len(failed_downloads) > 0:
+        failed_downloads.append(good_name)
+        print("Failed Downloads: ")
+        for download in failed_downloads:
+            print(download)
+        print()
+        print("Failed Downloads regex: {}".format("|".join(["({})".format(filename) for filename in failed_downloads])))
     print("Done downloading.")
