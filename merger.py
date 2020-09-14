@@ -15,7 +15,6 @@ for city in CITIES:
     folder = './bss/{}/'.format(city)
     print('Starting to merge files for {}'.format(city))
     with os.scandir(folder) as files:
-        count = 0
         for file in tqdm(sorted(files, key=lambda file: file.name)):
             if file.name.endswith('.csv') and file.is_file():
                 df = pd.read_csv(file.path)
@@ -26,8 +25,5 @@ for city in CITIES:
                     all_bss = converted_df
                 else:
                     all_bss = all_bss.append(converted_df)
-                count += 1
-            if count == 2:
-                break
 
 all_bss.to_csv('merged_bss.csv')

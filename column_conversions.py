@@ -241,10 +241,10 @@ class ColumbusConverter(Converter):
 # Not including this city because it doesn't have latitude and longitude until recently...
 
 CONVERTERS = {
-    # 'boston': BostonConverter(), 
-    # 'sf': SfConverter(), 
-    # 'nyc': NycConverter(), 
-    # 'portland': PortlandConverter(), 
+    'boston': BostonConverter(), 
+    'sf': SfConverter(), 
+    'nyc': NycConverter(), 
+    'portland': PortlandConverter(), 
     'columbus': ColumbusConverter()
 }
 CITIES = CONVERTERS.keys()
