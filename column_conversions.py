@@ -271,9 +271,9 @@ class ColumbusConverter(Converter):
 CONVERTERS = {
     'boston': BostonConverter(), 
     # 'sf': SfConverter(), FIXME remove comment if you want to include sf
-    'nyc': NycConverter(), 
     'portland': PortlandConverter(), 
-    'columbus': ColumbusConverter()
+    'columbus': ColumbusConverter(), 
+    'nyc': NycConverter()
 }
 CITIES = CONVERTERS.keys()
 
