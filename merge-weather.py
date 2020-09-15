@@ -1,4 +1,3 @@
-# FIXME why is difference always positive?
 import pandas as pd
 import numpy as np
 from datetime import datetime
@@ -39,23 +38,16 @@ def add_nearest_weather(city):
 
         differences = []
         for k in range(0, len(weather_indices)):
-            weather_index = weather_indices[k]
-            if weather_index == len(weather) - 1:
-                continue
-
-            difference = get_diff(weather_index) # in minutes
-            while weather_index < len(weather):
-                if not weather_na[WEATHER_COLUMNS[k]].iloc[weather_index]:
-                    new_difference = get_diff(weather_index)
-                    if abs(new_difference) >= abs(difference):
-                        break
-                    difference = new_difference
-                weather_index += 1
-            if weather_index == len(weather):
-                weather_index = len(weather) - 1
-                print('[WARN] weather index for {} reached last row at bss_index {}'.format(WEATHER_COLUMNS[k], bss_index))
-                print('start date: {} \t final weather date: {}'.format(start_datetime, datetime.strptime(weather.DATE.iloc[weather_index], '%Y-%m-%dT%H:%M:%S')))
-            weather_indices[k] = weather_index
+            difference = get_diff(weather_indices[k]) # in minutes
+            while weather_indices[k] < len(weather) - 1:
+                new_index = weather_indices[k] + 1
+                while new_index < len(weather) - 1 and not weather_na[WEATHER_COLUMNS[k]].iloc[new_index]:
+                    new_index += 1
+                new_difference = get_diff(new_index)
+                if abs(new_difference) > abs(difference):
+                    break
+                difference = new_difference
+                weather_indices[k] = new_index
             differences.append(difference)
         weather_values = {col_name: weather[col_name].iloc[i] for col_name, i in zip(WEATHER_COLUMNS, weather_indices)}
         for col_name, diff in zip(TIME_SINCE_COLUMNS, differences):
@@ -84,7 +76,8 @@ add_nearest_weather('columbus')
 # good_weather = weather[weather.snow.notna()]
 # good_weather.DATE.apply(lambda x: x[:10]).unique()
 
-# last_weather_date = datetime.strptime(weather.DATE.iloc[len(weather) - 1], '%Y-%m-%dT%H:%M:%S')
-# columbus_date = datetime.strptime(columbus_bss.start_datetime.iloc[5175], '%Y-%m-%d %H:%M:%S')
+# weather_date = datetime.strptime(weather.DATE.iloc[1162], '%Y-%m-%dT%H:%M:%S')
+# columbus_date = datetime.strptime(columbus_bss.start_datetime.iloc[1000], '%Y-%m-%d %H:%M:%S')
+# len(weather.DATE[weather.snow.notna()].unique()) == sum(weather.snow.notna())
 # delta = last_weather_date - columbus_date
 # return (delta.days * 24 + delta.seconds / 3600) # hours
