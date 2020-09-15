@@ -16,7 +16,7 @@ def references_weather_type(col_name):
 
 RESULTING_COLUMNS = FINAL_COLUMNS + WEATHER_COLUMNS + [col for col in TIME_SINCE_COLUMNS if not references_weather_type(col)] + [TIME_SINCE_WEATHER_TYPE]
 
-def add_nearest_weather(city):
+def add_nearest_weather(city, debug):
     print('starting bss csv download')
     bss = pd.read_csv('../final-bss-data/{}_bss.csv'.format(city))
     print('finished downloading bss csv')
@@ -26,9 +26,10 @@ def add_nearest_weather(city):
     weather_na = weather.isna()
 
     weather_at_start = None
-    weather_indices = [0] * len(WEATHER_COLUMNS)
+    weather_indices = [[i for i, is_na in enumerate(weather_na[col_name]) if not is_na][0] for col_name in WEATHER_COLUMNS]
     print('starting loop')
-    for bss_index in tqdm(range(0, len(bss))):
+    end = len(bss) if not debug else 100
+    for bss_index in tqdm(range(0, end)):
         start_datetime = datetime.strptime(bss[START_DATETIME].iloc[bss_index], '%Y-%m-%d %H:%M:%S')
 
         def get_diff(index):
@@ -41,7 +42,7 @@ def add_nearest_weather(city):
             difference = get_diff(weather_indices[k]) # in minutes
             while weather_indices[k] < len(weather) - 1:
                 new_index = weather_indices[k] + 1
-                while new_index < len(weather) - 1 and not weather_na[WEATHER_COLUMNS[k]].iloc[new_index]:
+                while new_index < len(weather) - 1 and weather_na[WEATHER_COLUMNS[k]].iloc[new_index]:
                     new_index += 1
                 new_difference = get_diff(new_index)
                 if abs(new_difference) > abs(difference):
@@ -60,13 +61,18 @@ def add_nearest_weather(city):
             weather_at_start = df_row
         else:
             weather_at_start = weather_at_start.append(df_row)
-    result = pd.concat([bss, weather_at_start], axis=1, sort=False)
+    bss_for_concat = bss if not debug else bss.iloc[0:100]
+    result = pd.concat([bss_for_concat, weather_at_start], axis=1, sort=False)
     result = result[RESULTING_COLUMNS]
-    result.to_csv('complete_{}_bss.csv'.format(city))
+    if debug:
+        return result
+    else:
+        result.to_csv('complete_{}_bss.csv'.format(city))
 
-add_nearest_weather('columbus')
-# add_nearest_weather('portland')
-# add_nearest_weather('boston')
+# add_nearest_weather('columbus', False)
+# add_nearest_weather('portland', False)
+# add_nearest_weather('boston', False)
+# add_nearest_weather('nyc', True)
 
 # portland_bss = pd.read_csv('../final-bss-data/portland_bss.csv')
 # boston_bss = pd.read_csv('../final-bss-data/boston_bss.csv')
