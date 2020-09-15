@@ -1,22 +1,29 @@
 from datetime import datetime
+from geopy.distance import geodesic
+import pandas as pd
+import numpy as np
 
 TRIP_DURATION = 'trip_duration' # computed for all from START_DATETIME and STOP_TIME. Don't use duration precomputed by some
 START_DATETIME = 'start_datetime'
+START_HOUR = 'start_hour'
 END_DATETIME = 'end_datetime'
 START_DAY_OF_WEEK = 'start_day_of_week' # computed from START_DATETIME
 START_LAT = 'start_latitude'
 START_LONG = 'start_longitude'
 END_LAT = 'end_latitude'
 END_LONG = 'end_longitude'
-START_STATION_NAME = 'start_station_name'
-END_STATION_NAME = 'end_station_name'
+# no longer using station names
+# START_STATION_NAME = 'start_station_name'
+# END_STATION_NAME = 'end_station_name'
+DISTANCE = 'distance_traveled'
 BIRTH_YEAR = 'birth_year' # some will be NA
+AGE = 'age'
 GENDER = 'gender' # some will be NA
 IS_SUBSCRIBER = 'is_subscriber' # categories need to be unified
 CITY = 'city'
 
-FINAL_COLUMNS = [TRIP_DURATION, START_DATETIME, END_DATETIME, START_DAY_OF_WEEK, START_LAT, START_LONG, END_LAT, END_LONG, START_STATION_NAME, END_STATION_NAME, BIRTH_YEAR, GENDER, IS_SUBSCRIBER, CITY]
-
+FINAL_COLUMNS = [TRIP_DURATION, START_DATETIME, START_HOUR, START_DAY_OF_WEEK, DISTANCE, AGE, GENDER, IS_SUBSCRIBER, CITY]
+coordinate_columns = [START_LAT, START_LONG, END_LAT, END_LONG]
 class Converter():
     def __init__(self, city_name, conversions, no_info_list=[]):
         super().__init__()
@@ -25,11 +32,13 @@ class Converter():
         self.no_info_list = no_info_list
 
     def convert(self, df):
-        info_list = set([START_STATION_NAME, END_STATION_NAME, GENDER, BIRTH_YEAR]) - set(self.no_info_list)
+        info_list = set([GENDER, BIRTH_YEAR]) - set(self.no_info_list)
         self.update_pre_conversion(df)
         specific_conversions = {original: replacement for original, replacement in self.conversions.items() if original in df.columns}
 
         df.rename(columns=specific_conversions, inplace=True)
+        have_coordinates = df[coordinate_columns].notna().apply(lambda row: all(row), axis=1)
+        df = df.loc[have_coordinates]
 
         info_list -= set(df.columns)
         if len(info_list) > 0:
@@ -53,6 +62,24 @@ class Converter():
 
     def add_computed_values(self, df):
         df[CITY] = [self.city_name] * len(df)
+        gender_mapper = {0: '', 1: 'Male', 2: 'Female', 'Male': 'Male', 'Female': 'Female'}
+        if GENDER in df.columns:
+            df[GENDER] = df[GENDER].map(gender_mapper)
+
+        def get_age(row):
+            if pd.isnull(row[1]):
+                return np.NaN
+            current_year = int(row[0][0:4])
+            return current_year - row[1]
+        if BIRTH_YEAR in df.columns:
+            df[AGE] = df[[START_DATETIME, BIRTH_YEAR]].apply(get_age, axis=1)
+        else:
+            df[AGE] = np.nan
+
+        def get_distance(row):
+            return geodesic((row[0], row[1]), (row[2], row[3])).kilometers
+        df[DISTANCE] = df[coordinate_columns].apply(get_distance, axis=1)
+
         df[START_DATETIME] = df[START_DATETIME].apply(lambda date_string: date_string[:19]) # removes decimals. Date format must be 2019-01-31 17:57:44.1234
         df[END_DATETIME] = df[END_DATETIME].apply(lambda date_string: date_string[:19]) # removes decimals. Date format must be 2019-01-31 17:57:44.1234
 
@@ -61,7 +88,8 @@ class Converter():
         start_datetimes = df[START_DATETIME].apply(get_datetime)
         end_datetimes = df[END_DATETIME].apply(get_datetime)
         df[START_DAY_OF_WEEK] = start_datetimes.apply(lambda date: date.strftime('%A'))
-        df[TRIP_DURATION] = start_datetimes - end_datetimes
+        df[START_HOUR] = start_datetimes.apply(lambda date: date.strftime('%H'))
+        df[TRIP_DURATION] = end_datetimes - start_datetimes
         df[TRIP_DURATION] = df[TRIP_DURATION].apply(lambda time_delta: time_delta.total_seconds())
     
     def update_pre_conversion(self, df):
@@ -80,8 +108,8 @@ NYC_CONVERSIONS['start station latitude'] = START_LAT
 NYC_CONVERSIONS['start station longitude'] = START_LONG
 NYC_CONVERSIONS['end station latitude'] = END_LAT
 NYC_CONVERSIONS['end station longitude'] = END_LONG
-NYC_CONVERSIONS['start station name'] = START_STATION_NAME
-NYC_CONVERSIONS['end station name'] = END_STATION_NAME
+# NYC_CONVERSIONS['start station name'] = START_STATION_NAME
+# NYC_CONVERSIONS['end station name'] = END_STATION_NAME
 NYC_CONVERSIONS['birth year'] = BIRTH_YEAR
 NYC_CONVERSIONS['gender'] = GENDER
 NYC_CONVERSIONS['usertype'] = IS_SUBSCRIBER
@@ -106,8 +134,8 @@ PORTLAND_CONVERSIONS['EndLatitude'] = END_LAT
 PORTLAND_CONVERSIONS['End_Latitude'] = END_LAT
 PORTLAND_CONVERSIONS['EndLongitude'] = END_LONG
 PORTLAND_CONVERSIONS['End_Longitude'] = END_LONG
-PORTLAND_CONVERSIONS['StartHub'] = START_STATION_NAME
-PORTLAND_CONVERSIONS['EndHub'] = END_STATION_NAME
+# PORTLAND_CONVERSIONS['StartHub'] = START_STATION_NAME
+# PORTLAND_CONVERSIONS['EndHub'] = END_STATION_NAME
 PORTLAND_CONVERSIONS['PaymentPlan'] = IS_SUBSCRIBER
 
 def reformat_date(date_string):
@@ -147,8 +175,8 @@ BOSTON_CONVERSIONS['start station latitude'] = START_LAT
 BOSTON_CONVERSIONS['start station longitude'] = START_LONG
 BOSTON_CONVERSIONS['end station latitude'] = END_LAT
 BOSTON_CONVERSIONS['end station longitude'] = END_LONG
-BOSTON_CONVERSIONS['start station name'] = START_STATION_NAME
-BOSTON_CONVERSIONS['end station name'] = END_STATION_NAME
+# BOSTON_CONVERSIONS['start station name'] = START_STATION_NAME
+# BOSTON_CONVERSIONS['end station name'] = END_STATION_NAME
 BOSTON_CONVERSIONS['birth year'] = BIRTH_YEAR
 BOSTON_CONVERSIONS['gender'] = GENDER
 BOSTON_CONVERSIONS['usertype'] = IS_SUBSCRIBER
@@ -169,8 +197,8 @@ SF_CONVERSIONS['start_station_latitude'] = START_LAT
 SF_CONVERSIONS['start_station_longitude'] = START_LONG
 SF_CONVERSIONS['end_station_latitude'] = END_LAT
 SF_CONVERSIONS['end_station_longitude'] = END_LONG
-SF_CONVERSIONS['start_station_name'] = START_STATION_NAME
-SF_CONVERSIONS['end_station_name'] = END_STATION_NAME
+# SF_CONVERSIONS['start_station_name'] = START_STATION_NAME
+# SF_CONVERSIONS['end_station_name'] = END_STATION_NAME
 SF_CONVERSIONS['user_type'] = IS_SUBSCRIBER
 
 NEW_SF_COLUMBUS_CONVERSIONS = {}
@@ -180,8 +208,8 @@ NEW_SF_COLUMBUS_CONVERSIONS['start_lat'] = START_LAT
 NEW_SF_COLUMBUS_CONVERSIONS['start_lng'] = START_LONG
 NEW_SF_COLUMBUS_CONVERSIONS['end_lat'] = END_LAT
 NEW_SF_COLUMBUS_CONVERSIONS['end_lng'] = END_LONG
-NEW_SF_COLUMBUS_CONVERSIONS['start_station_name'] = START_STATION_NAME
-NEW_SF_COLUMBUS_CONVERSIONS['end_station_name'] = END_STATION_NAME
+# NEW_SF_COLUMBUS_CONVERSIONS['start_station_name'] = START_STATION_NAME
+# NEW_SF_COLUMBUS_CONVERSIONS['end_station_name'] = END_STATION_NAME
 NEW_SF_COLUMBUS_CONVERSIONS['member_casual'] = IS_SUBSCRIBER
 
 SF_CONVERSIONS.update(NEW_SF_COLUMBUS_CONVERSIONS)
@@ -201,10 +229,10 @@ COLUMBUS_CONVERSIONS['Start Station Lat'] = START_LAT
 COLUMBUS_CONVERSIONS['Start Station Long'] = START_LONG
 COLUMBUS_CONVERSIONS['Stop Station Lat'] = END_LAT
 COLUMBUS_CONVERSIONS['Stop Station Long'] = END_LONG
-COLUMBUS_CONVERSIONS['Start Station Name'] = START_STATION_NAME
-COLUMBUS_CONVERSIONS['from_station_name'] = START_STATION_NAME
-COLUMBUS_CONVERSIONS['Stop Station Name'] = END_STATION_NAME
-COLUMBUS_CONVERSIONS['to_station_name'] = END_STATION_NAME
+# COLUMBUS_CONVERSIONS['Start Station Name'] = START_STATION_NAME
+# COLUMBUS_CONVERSIONS['from_station_name'] = START_STATION_NAME
+# COLUMBUS_CONVERSIONS['Stop Station Name'] = END_STATION_NAME
+# COLUMBUS_CONVERSIONS['to_station_name'] = END_STATION_NAME
 COLUMBUS_CONVERSIONS['Year of Birth'] = BIRTH_YEAR
 COLUMBUS_CONVERSIONS['birthyear'] = BIRTH_YEAR
 COLUMBUS_CONVERSIONS['Gender'] = GENDER
@@ -242,7 +270,7 @@ class ColumbusConverter(Converter):
 
 CONVERTERS = {
     'boston': BostonConverter(), 
-    'sf': SfConverter(), 
+    # 'sf': SfConverter(), FIXME remove comment if you want to include sf
     'nyc': NycConverter(), 
     'portland': PortlandConverter(), 
     'columbus': ColumbusConverter()
@@ -254,7 +282,6 @@ def convert_df(df, city):
         raise ValueError('{} is not a valid city'.format(city))
     return CONVERTERS[city].convert(df)
 
-# import pandas as pd
 # portland1 = pd.read_csv('./bss/portland/2020_07.csv')
 # portland2 = pd.read_csv('./bss/portland/2018_02.csv')
 # nyc1 = pd.read_csv('./202008-citibike-tripdata.csv')

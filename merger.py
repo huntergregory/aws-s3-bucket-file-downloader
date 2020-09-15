@@ -26,10 +26,29 @@ for city in CITIES:
                     city_bss = converted_df
                 else:
                     city_bss = city_bss.append(converted_df)
+    city_bss = city_bss[FINAL_COLUMNS]
     city_bss.to_csv('{}_bss.csv'.format(city))
-    if all_bss is None:
-        all_bss = city_bss
-    else:
-        all_bss.append(city_bss)
+# FIXME uncomment rest if you have enough space on disk to merge all csvs at once
+#     if all_bss is None:
+#         all_bss = city_bss
+#     else:
+#         all_bss.append(city_bss)
 
-all_bss.to_csv('all_bss.csv')
+# all_bss = all_bss[FINAL_COLUMNS]
+# all_bss.to_csv('all_bss.csv')
+
+
+## Useful for EDA when station names and coordinates were included. Checking coordinates for stations
+# start_cols = ['start_station_name', 'start_latitude', 'start_longitude']
+# end_cols = ['end_station_name', 'end_latitude', 'end_longitude']
+
+# def get_station_df(df, cols):
+#     renamer = {cols[0]: 'station_name', cols[1]: 'latitude', cols[2]: 'longitude'}
+#     result = df[cols].rename(columns=renamer)
+#     result[['latitude', 'longitude']] = result[['latitude', 'longitude']].apply(lambda x: round(x, 6))
+#     return result
+
+# stations = get_station_df(full_columbus, start_cols).append(get_station_df(full_columbus, end_cols)).drop_duplicates().sort_values('station_name')
+# len(stations.station_name.unique())
+# len(stations)
+# stations.latitude.iloc[0] == stations.latitude.iloc[1]
